@@ -1,0 +1,37 @@
+type Comment {
+  id: String!
+  content: String!
+  createdAt: Date!
+  userId: String!
+}
+
+type CommentCollection {
+  items: [Comment!]!
+  cursor: String
+  totalCount: Int!
+}
+
+type Resource {
+  id: String!
+  name: String!
+  createdAt: DateTime!
+  comments(limit: Int! = 10, cursor: String = null): CommentCollection!
+}
+
+type ResourceCollection {
+  items: [Resource!]!
+  cursor: String
+  totalCount: Int!
+}
+
+type User {
+  id: String!
+  name: String!
+  resources(limit: Int! = 10, cursor: String = null): ResourceCollection!
+}
+
+type Query {
+  user(id: String!): User
+
+  resource(id: String!, userId: String!): Resource
+}

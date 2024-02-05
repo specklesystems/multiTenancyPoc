@@ -1,0 +1,8 @@
+.postgres-data
+.tool-versions
+.env
+.envrc
+.swc
+node_modules
+
+dist
