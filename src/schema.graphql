@@ -30,8 +30,59 @@ type User {
   resources(limit: Int! = 10, cursor: String = null): ResourceCollection!
 }
 
+type Organization {
+  id: String!
+  name: String!
+}
+
+type Region {
+  id: String!
+  name: String!
+  maintenanceDb: String!
+}
+
 type Query {
   user(id: String!): User
+  users: [User!]
 
   resource(id: String!, userId: String!): Resource
+
+  organizations: [Organization!]
+  regions: [Region!]
+}
+
+input ResourceCreateInput {
+  userId: String!
+  name: String!
+  organizationId: String = null
+  regionId: String = null
+}
+
+input OrganizationAcl {
+  userId: String!
+  organizationId: String!
+}
+
+input CommentInput {
+  userId: String!
+  content: String!
+  resourceId: String!
+}
+
+input UserCreateArgs {
+  name: String!
+}
+
+type Mutation {
+  createUser(input: UserCreateArgs!): String!
+  registerRegion(
+    name: String!
+    connectionString: String!
+    maintenanceDb: String!
+  ): String!
+  createOrganization(name: String!): String!
+  addRegionToOrganization(organizationId: String!, regionId: String!): Boolean
+  addUserToOrganization(input: OrganizationAcl!): Boolean
+  createResource(input: ResourceCreateInput!): String!
+  addComment(input: CommentInput!): String!
 }
