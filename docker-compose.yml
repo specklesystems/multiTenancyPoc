@@ -11,3 +11,25 @@ services:
       - POSTGRES_PASSWORD=speckle
       - POSTGRES_USER=speckle
       - POSTGRES_DB=speckle_main
+
+  region-1:
+    image: postgres:16-alpine
+    ports:
+      - 5455:5432
+    volumes:
+      - ./.postgres-region-1:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=speckle
+      - POSTGRES_USER=speckle
+      - POSTGRES_DB=speckle_main
+
+  region-2:
+    image: postgres:16-alpine
+    ports:
+      - 5456:5432
+    volumes:
+      - ./.postgres-region-2:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=speckle
+      - POSTGRES_USER=speckle
+      - POSTGRES_DB=speckle_main
