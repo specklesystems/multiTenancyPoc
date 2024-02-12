@@ -30,11 +30,12 @@ const migrateToLatest = async (client: Knex): Promise<void> => {
 };
 
 export const migrateAll = async (): Promise<void> => {
+  await migrateToLatest(mainClient);
   const databaseSchemas = await getAllDatabaseSchemaConnections();
 
-  await Promise.all(
-    databaseSchemas.map(async (sc) => await migrateToLatest(sc)),
-  );
+  await Promise.all([
+    ...databaseSchemas.map(async (sc) => await migrateToLatest(sc)),
+  ]);
   // 1. get all regions from main DB
   // 2. construct region specific knex clients and cache them by
   // 3. structure the cache so that it accomodates client creation by resource id
