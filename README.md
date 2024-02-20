@@ -19,6 +19,16 @@ it is done with running the SQL command below, and restating the database server
 ALTER SYSTEM SET wal_level = logical;
 ```
 
+When registering a new region on a DigitalOcean postgres server, the default user doesn't have the required roles to set up a subscription.
+On DO we can use [aiven-extras](https://github.com/aiven/aiven-extras) to create subs without root access.
+The current branch is utilizing just that. But it needs a setup step executed on each database, that is registered as a region
+
+Run this in a `psql` shell
+
+```sql
+CREATE EXTENSION aiven_extras;
+```
+
 Note: Postgres subscriptions (which we use) in the same db server don't work that easily; easiest way to get things going is to set up multiple db servers locally.
 
 ## Project description
@@ -52,11 +62,10 @@ Organizations may be granted access to any given region. That action creates a n
 ## Steps to flex this POC
 
 Using the exposed graphql explorer, you can go ahead and
-- create a user 
+
+- create a user
 - create an organisation
 - add the user to the organisation
 - create regions & associate them with an organisation
 - create a resource in the default organisation, or for a specific organisation & region
 - etc.
-
-  
