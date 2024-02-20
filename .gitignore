@@ -4,5 +4,6 @@
 .envrc
 .swc
 node_modules
+.ca-cert*
 
 dist

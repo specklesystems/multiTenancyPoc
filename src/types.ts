@@ -65,7 +65,7 @@ export interface Region {
   id: string;
   name: string;
   connectionString: string;
-  maintenanceDb: string;
+  sslCaCert: string | null;
 }
 
 export interface Organization {
@@ -93,6 +93,7 @@ export interface ResourceRegion {
   regionId: string;
 }
 
-export interface ResourceRegionOrg extends ResourceRegion {
+export interface ResourceOrganization {
+  resourceId: string;
   organizationId: string;
 }

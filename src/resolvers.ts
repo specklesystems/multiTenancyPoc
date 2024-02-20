@@ -1,22 +1,4 @@
-import {
-  getOrganizationsFrom,
-  getRegionsFrom,
-  queryOrganizationAclFrom,
-  queryOrganizationRegionsFrom,
-  queryResourceAclFrom,
-  saveOrganizationResourceAclTo,
-  saveOrganizationAclTo,
-  saveResourceAclTo,
-  saveResourceTo,
-  saveResourceRegionOrganizationTo,
-  saveCommentTo,
-  queryResourceFrom,
-  queryUser,
-  countCommentsIn,
-  queryCommentsFrom,
-  getUsersFrom,
-  saveUserTo,
-} from "./repositories";
+import { RegionRepo, MainRepo } from "./repositories";
 import { getComments } from "./services/comments";
 import { createResource, getResources } from "./services/resources";
 import { GraphQLError } from "graphql";
@@ -32,12 +14,11 @@ import {
   UserCreateArgs,
 } from "./types";
 import {
-  bindRegionToOrganization,
   createOrganization,
-  getDbClient,
-  getMainDbClient,
-  getResourceDatabaseConnection,
   registerRegion,
+  getMainRepo,
+  getRegionRepo,
+  getResourceRepo,
 } from "./services/databaseManagement";
 import { authorizeUserOrgRegion } from "./services/authz";
 import cryptoRandomString from "crypto-random-string";
@@ -47,17 +28,17 @@ import cryptoRandomString from "crypto-random-string";
 export const resolvers = {
   Query: {
     async users() {
-      return await getUsersFrom(getMainDbClient())();
+      return await getMainRepo().queryUsers();
     },
     async user(_: unknown, args: { id: string }) {
-      return await queryUser(args.id);
+      return await getMainRepo().findUser(args.id);
     },
     async resource(
       _: unknown,
       args: { id: string; userId: string },
     ): Promise<Resource> {
-      const mainDb = getMainDbClient();
-      const maybeAcl = await queryResourceAclFrom(mainDb)({
+      const mainRepo = getMainRepo();
+      const maybeAcl = await mainRepo.getUsersResourceAcl({
         userId: args.userId,
         resourceId: args.id,
       });
@@ -71,8 +52,8 @@ export const resolvers = {
           },
         );
       }
-      const db = await getResourceDatabaseConnection(args.id);
-      const maybeResource = await queryResourceFrom(db)(args.id);
+      const resourceRepo = await getResourceRepo(args.id);
+      const maybeResource = await resourceRepo.findResource(args.id);
       if (maybeResource == null) {
         throw new GraphQLError("Resource not found", {
           extensions: { code: "RESOURCE_NOT_FOUND" },
@@ -81,15 +62,19 @@ export const resolvers = {
       return maybeResource;
     },
     async organizations() {
-      return await getOrganizationsFrom(getMainDbClient())();
+      return await getMainRepo().queryOrganizations();
     },
     async regions() {
-      return await getRegionsFrom(getMainDbClient())();
+      return await getMainRepo().queryRegions();
     },
   },
   User: {
     async resources(parent: UserRecord, args: PaginationArgs) {
-      return await getResources({ userId: parent.id, ...args });
+      const mainRepo = getMainRepo();
+      return await getResources(
+        mainRepo.countUsersResources.bind(mainRepo),
+        mainRepo.queryResources.bind(mainRepo),
+      )({ userId: parent.id, ...args });
     },
   },
   Resource: {
@@ -97,10 +82,10 @@ export const resolvers = {
       parent: Resource,
       { limit, cursor }: PaginationArgs,
     ): Promise<CommentCollection> {
-      const db = await getResourceDatabaseConnection(parent.id);
+      const resourceRepo = await getResourceRepo(parent.id);
       return await getComments(
-        countCommentsIn(db),
-        queryCommentsFrom(db),
+        resourceRepo.countComments.bind(resourceRepo),
+        resourceRepo.queryComments.bind(resourceRepo),
       )({
         resourceId: parent.id,
         limit,
@@ -114,7 +99,7 @@ export const resolvers = {
       { input: { name } }: { input: UserCreateArgs },
     ) {
       const id = cryptoRandomString({ length: 10 });
-      await saveUserTo(getMainDbClient())({ id, name });
+      await getMainRepo().saveUser({ id, name });
       return id;
     },
     async registerRegion(
@@ -122,7 +107,7 @@ export const resolvers = {
       args: {
         name: string;
         connectionString: string;
-        maintenanceDb: string;
+        sslCaCert: string | null;
       },
     ) {
       return await registerRegion(args);
@@ -131,48 +116,44 @@ export const resolvers = {
       return await createOrganization(args.name);
     },
     async addRegionToOrganization(_: unknown, args: OrganizationsRegions) {
-      await bindRegionToOrganization(args);
+      await getMainRepo().saveOrganizationRegion(args);
     },
     async addUserToOrganization(
       _: unknown,
       { input: args }: { input: OrganizationAcl },
     ) {
-      await saveOrganizationAclTo(getMainDbClient())(args);
+      await getMainRepo().saveOrganizationAcl(args);
     },
     async createResource(
       _: unknown,
       { input: args }: { input: ResourceCreateArgs },
     ) {
-      const mainDb = getMainDbClient();
+      const mainRepo = getMainRepo();
       await authorizeUserOrgRegion(
-        queryOrganizationAclFrom(mainDb),
-        queryOrganizationRegionsFrom(mainDb),
+        mainRepo.findOrganizationAcl.bind(mainRepo),
+        mainRepo.findOrganizationRegion.bind(mainRepo),
       )(args);
 
-      const db =
-        args.regionId && args.organizationId
-          ? await getDbClient({
-              regionId: args.regionId,
-              organizationId: args.organizationId,
-            })
-          : mainDb;
+      const repo = args.regionId
+        ? await getRegionRepo({ regionId: args.regionId })
+        : mainRepo;
 
       const resourceId = await createResource(
-        saveResourceTo(db),
-        saveResourceAclTo(mainDb),
+        repo.saveResource.bind(repo),
+        mainRepo.saveResourceAcl.bind(mainRepo),
       )(args);
 
       if (args.organizationId) {
-        await saveOrganizationResourceAclTo(mainDb)({
+        await mainRepo.saveOrganizationResourceAcl({
           organizationId: args.organizationId,
           resourceId,
         });
-        await saveResourceRegionOrganizationTo(mainDb)({
-          resourceId,
-          organizationId: args.organizationId,
-          // i know its not null here, the authz function ensures it
-          regionId: args.regionId!,
-        });
+        if (args.regionId)
+          await mainRepo.saveResourceRegion({
+            resourceId,
+            // i know its not null here, the authz function ensures it
+            regionId: args.regionId,
+          });
       }
       return resourceId;
     },
@@ -180,16 +161,16 @@ export const resolvers = {
       _: unknown,
       { input: args }: { input: CommentCreateArgs },
     ) {
-      const mainDb = getMainDbClient();
-      const resourceAcl = await queryResourceAclFrom(mainDb)(args);
+      const mainRepo = getMainRepo();
+      const resourceAcl = await mainRepo.getUsersResourceAcl(args);
       if (!resourceAcl)
         throw new Error("The user doesn't have access to the given resource");
       //2. get resource db client
-      const db = await getResourceDatabaseConnection(args.resourceId);
+      const resourceRepo = await getResourceRepo(args.resourceId);
       //3. save comment to db
       const id = cryptoRandomString({ length: 10 });
       const createdAt = new Date();
-      await saveCommentTo(db)({ id, createdAt, ...args });
+      await resourceRepo.saveComment({ id, createdAt, ...args });
       return id;
     },
   },

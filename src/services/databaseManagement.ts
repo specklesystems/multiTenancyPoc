@@ -1,20 +1,11 @@
 import { POSTGRES_URL } from "../config";
-import {
-  getOrganizationFrom,
-  getOrganizationRegionsFrom,
-  getRegionFrom,
-  queryResourceRegionOrganizationFrom,
-  saveOrganizationTo,
-  saveOrganizationsRegionsTo,
-  saveRegionTo,
-} from "../repositories";
-import { OrganizationsRegions, Region } from "../types";
+import { RegionRepo, MainRepo } from "../repositories";
 import knex, { Knex } from "knex";
 import cryptoRandomString from "crypto-random-string";
 
-const migrateToLatest = async (client: Knex): Promise<void> => {
+const migrateToLatest = async (db: Knex): Promise<void> => {
   const plannedMigrations: Array<{ file: string }> = (
-    await client.migrate.list()
+    await db.migrate.list()
   )[1];
   if (plannedMigrations.length > 0) {
     console.log(
@@ -26,133 +17,146 @@ const migrateToLatest = async (client: Knex): Promise<void> => {
     console.log("no migrations are planned");
   }
   // TODO: make sure if a migration fails, all migrations are rolled back
-  await client.migrate.latest();
+  await db.migrate.latest();
 };
 
 export const migrateAll = async (): Promise<void> => {
-  await migrateToLatest(mainClient);
-  const databaseSchemas = await getAllDatabaseSchemaConnections();
+  await migrateToLatest(mainRepo.db);
+  const repos = await getAllRepositories();
 
   await Promise.all([
-    ...databaseSchemas.map(async (sc) => await migrateToLatest(sc)),
+    ...repos.map(async (repo) => await migrateToLatest(repo.db)),
   ]);
-  // 1. get all regions from main DB
-  // 2. construct region specific knex clients and cache them by
-  // 3. structure the cache so that it accomodates client creation by resource id
-  // 4. get all organization regions from main DB
-  // 5. for in all regions for all organizations, run the migration
-  // 6. do not forget the migration for the main DB
-  //
 };
 
-const createDatabaseConfig = (connectionString: string): Knex.Config => {
-  return {
+const createDatabaseConfig = (
+  connectionString: string,
+  sslCaCert: string | null,
+): Knex.Config => {
+  const config: Knex.Config = {
     client: "pg",
     connection: {
       connectionString,
+      ssl: sslCaCert
+        ? {
+            ca: sslCaCert,
+            rejectUnauthorized: true,
+          }
+        : undefined,
     },
-    // connection: connectionString,
     migrations: {
       directory: "src/migrations",
       extension: "ts",
     },
   };
+  return config;
 };
 
-const mainClient = knex(createDatabaseConfig(POSTGRES_URL));
+const mainRepo = new MainRepo(knex(createDatabaseConfig(POSTGRES_URL, null)));
 
-const _connectionStore: Map<string, Knex> = new Map();
-
-interface RegionWithMaybeOrganization {
-  regionId: string;
-  organizationId?: string | undefined;
-}
-
-const _createConnectionKey = ({
-  organizationId,
+const _repoStore: Map<string, RegionRepo> = new Map();
+export const getRegionRepo = async ({
   regionId,
-}: RegionWithMaybeOrganization): string => {
-  return organizationId ? `${organizationId}@${regionId}` : regionId;
-};
-
-export const getDbClient = async ({
-  regionId,
-  organizationId,
-}: RegionWithMaybeOrganization): Promise<Knex> => {
-  const connectionKey = _createConnectionKey({ organizationId, regionId });
-  const maybeClient = _connectionStore.get(connectionKey);
-  if (maybeClient) return maybeClient;
-  const maybeRegion = await mainClient<Region>("regions")
-    .select()
-    .where({ id: regionId })
-    .first();
+}: {
+  regionId: string | undefined;
+}): Promise<RegionRepo> => {
+  if (!regionId) return mainRepo;
+  const maybeRepo = _repoStore.get(regionId);
+  if (maybeRepo) return maybeRepo;
+  const maybeRegion = await mainRepo.findRegion(regionId);
   if (!maybeRegion) throw Error(`region ${regionId} not found`);
-  const connectionString = organizationId
-    ? `${maybeRegion.connectionString}/${organizationId}`
-    : `${maybeRegion.connectionString}/${maybeRegion.maintenanceDb}`;
-  const client = knex(createDatabaseConfig(connectionString));
-  _connectionStore.set(connectionKey, client);
-  return client;
+  const repo = new RegionRepo(
+    knex(
+      createDatabaseConfig(maybeRegion.connectionString, maybeRegion.sslCaCert),
+    ),
+  );
+  _repoStore.set(regionId, repo);
+  return repo;
 };
 
-export const getMainDbClient = (): Knex => mainClient;
+export const getMainRepo = (): MainRepo => mainRepo;
 
 export const registerRegion = async ({
   name,
   connectionString,
-  maintenanceDb,
+  sslCaCert,
 }: {
   name: string;
   connectionString: string;
-  maintenanceDb: string;
+  sslCaCert: string | null;
 }): Promise<string> => {
-  // TODO: validate the connectionString, so that the knex client can connect to it
+  const regions = await mainRepo.queryRegions({ connectionString });
+  if (regions.length) throw new Error("This region is already registered");
   const id = cryptoRandomString({ length: 10 });
-  await saveRegionTo(mainClient)({
+  const repo = new RegionRepo(
+    knex(createDatabaseConfig(connectionString, sslCaCert)),
+  );
+  await migrateToLatest(repo.db);
+  _repoStore.set(id, repo);
+
+  const sslmode = sslCaCert ? "require" : "disable";
+  await setUpUserReplication({
+    from: mainRepo.db,
+    to: repo.db,
+    regionName: name,
+    sslmode,
+  });
+  await setUpResourceReplication({
+    from: repo.db,
+    to: mainRepo.db,
+    regionName: name,
+    sslmode,
+  });
+
+  await mainRepo.saveRegion({
     id,
     name,
     connectionString,
-    maintenanceDb,
+    sslCaCert,
   });
   return id;
 };
 
 export const createOrganization = async (name: string): Promise<string> => {
   const id = cryptoRandomString({ length: 10 });
-  await saveOrganizationTo(mainClient)({ id, name });
+  await mainRepo.saveOrganization({ id, name });
   return id;
 };
 
-const createDb = async (client: Knex, name: string): Promise<void> => {
-  try {
-    await client.raw(`create database "${name}"`);
-  } catch (err) {
-    if (!(err instanceof Error)) throw err;
-    if (!err.message.includes("already exists")) throw err;
-  }
+type ReplicationArgs = {
+  from: Knex;
+  to: Knex;
+  sslmode: string;
+  regionName: string;
 };
 
 const setUpUserReplication = async ({
   from,
   to,
-}: {
-  from: Knex;
-  to: Knex;
-}): Promise<void> => {
+  sslmode,
+  regionName,
+}: ReplicationArgs): Promise<void> => {
   // TODO: ensure its created...
-  const connectionString: string =
-    from.client.config.connection.connectionString;
   try {
     await from.raw("CREATE PUBLICATION userspub FOR TABLE users;");
   } catch (err) {
     if (!(err instanceof Error)) throw err;
     if (!err.message.includes("already exists")) throw err;
   }
+
+  const fromUrl = new URL(from.client.config.connection.connectionString);
+  const fromDbName = fromUrl.pathname.replace("/", "");
+  const subName = `userssub_${regionName}`;
+  const rawSqeel = `SELECT * FROM aiven_extras.pg_create_subscription(
+    '${subName}',
+    'dbname=${fromDbName} host=${fromUrl.hostname} port=${fromUrl.port} sslmode=${sslmode} user=${fromUrl.username} password=${fromUrl.password}',
+    'userspub', 
+    '${subName}',
+    TRUE,
+    TRUE
+  );`;
   try {
-    const toUrl = new URL(to.client.config.connection.connectionString);
-    await to.raw(
-      `CREATE SUBSCRIPTION userssub_${toUrl.pathname.replace("/", "")} CONNECTION '${connectionString}' PUBLICATION userspub;`,
-    );
+    await to.raw(rawSqeel);
   } catch (err) {
     if (!(err instanceof Error)) throw err;
     if (!err.message.includes("already exists")) throw err;
@@ -161,83 +165,48 @@ const setUpUserReplication = async ({
 
 const setUpResourceReplication = async ({
   from,
-  fromRegionName,
   to,
-}: {
-  from: Knex;
-  fromRegionName: string;
-  to: Knex;
-}): Promise<void> => {
+  regionName,
+  sslmode,
+}: ReplicationArgs): Promise<void> => {
   // TODO: ensure its created...
-  const connectionString: string =
-    from.client.config.connection.connectionString;
-  const connUrl = new URL(connectionString);
   try {
     await from.raw("CREATE PUBLICATION resourcepub FOR TABLE resources;");
   } catch (err) {
     if (!(err instanceof Error)) throw err;
     if (!err.message.includes("already exists")) throw err;
   }
+
+  const fromUrl = new URL(from.client.config.connection.connectionString);
+  const fromDbName = fromUrl.pathname.replace("/", "");
+  const subName = `resourcesub_${regionName}`;
+  const rawSqeel = `SELECT * FROM aiven_extras.pg_create_subscription(
+    '${subName}',
+    'dbname=${fromDbName} host=${fromUrl.hostname} port=${fromUrl.port} sslmode=${sslmode} user=${fromUrl.username} password=${fromUrl.password}',
+    'resourcepub', 
+    '${subName}',
+    TRUE,
+    TRUE
+  );`;
   try {
-    await to.raw(
-      `CREATE SUBSCRIPTION "resroucesub_${fromRegionName.replace(
-        " ",
-        "",
-      )}_${connUrl.pathname.replace(
-        "/",
-        "",
-      )}" CONNECTION '${connectionString}' PUBLICATION resourcepub;`,
-    );
+    await to.raw(rawSqeel);
   } catch (err) {
     if (!(err instanceof Error)) throw err;
     if (!err.message.includes("already exists")) throw err;
   }
 };
 
-export const bindRegionToOrganization = async ({
-  regionId,
-  organizationId,
-}: OrganizationsRegions): Promise<void> => {
-  const region = await getRegionFrom(mainClient)(regionId);
-  if (!region) throw Error(`region ${regionId} not found`);
-  const organization = await getOrganizationFrom(mainClient)(organizationId);
-  if (!organization) throw Error(`organization ${organizationId} not found`);
-
-  const regionClient = await getDbClient({ regionId });
-
-  await createDb(regionClient, organizationId);
-
-  const client = await getDbClient({ organizationId, regionId });
-  const connectionKey = _createConnectionKey({ organizationId, regionId });
-
-  await migrateToLatest(client);
-
-  await setUpUserReplication({ from: mainClient, to: client });
-  await setUpResourceReplication({
-    from: client,
-    fromRegionName: region.name,
-    to: mainClient,
-  });
-
-  _connectionStore.set(connectionKey, client);
-  await saveOrganizationsRegionsTo(mainClient)({ organizationId, regionId });
-};
-
-export const getAllDatabaseSchemaConnections = async (): Promise<Knex[]> => {
-  const organizationRegions = await getOrganizationRegionsFrom(mainClient)();
-  const clients = await Promise.all(
-    organizationRegions.map(async (or) => {
-      const client = await getDbClient(or);
-      return client;
-    }),
+export const getAllRepositories = async (): Promise<RegionRepo[]> => {
+  const regions = await mainRepo.queryRegions({});
+  const regionRepos = await Promise.all(
+    regions.map(async (region) => await getRegionRepo({ regionId: region.id })),
   );
-  return [mainClient, ...clients];
+  return [mainRepo, ...regionRepos];
 };
 
-export const getResourceDatabaseConnection = async (
+export const getResourceRepo = async (
   resourceId: string,
-): Promise<Knex> => {
-  const resourceRegionOrg =
-    await queryResourceRegionOrganizationFrom(mainClient)(resourceId);
-  return resourceRegionOrg ? await getDbClient(resourceRegionOrg) : mainClient;
+): Promise<RegionRepo> => {
+  const resourceRegion = await mainRepo.findResourceRegion({ resourceId });
+  return resourceRegion ? await getRegionRepo(resourceRegion) : getMainRepo();
 };
