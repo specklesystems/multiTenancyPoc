@@ -1,15 +1,15 @@
-import type { Knex } from "knex";
+import type { Knex } from 'knex'
 
-const regionsTableName = "regions";
+const regionsTableName = 'regions'
 
-export async function up(knex: Knex): Promise<void> {
+export async function up (knex: Knex): Promise<void> {
   await knex.schema.alterTable(regionsTableName, (table) => {
-    table.text("maintenanceDb").notNullable().defaultTo("region");
-  });
+    table.text('maintenanceDb').notNullable().defaultTo('region')
+  })
 }
 
-export async function down(knex: Knex): Promise<void> {
+export async function down (knex: Knex): Promise<void> {
   await knex.schema.alterTable(regionsTableName, (table) => {
-    table.dropColumn("maintenanceDb");
-  });
+    table.dropColumn('maintenanceDb')
+  })
 }

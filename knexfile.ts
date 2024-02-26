@@ -1,26 +1,26 @@
-import { Knex } from "knex";
-import fs from "fs";
-import path from "path";
+import { Knex } from 'knex'
+import fs from 'fs'
+import path from 'path'
 
-console.log(`foobar ${process.env.POSTGRES_CA_CERT_PATH}`);
+console.log(`foobar ${process.env.POSTGRES_CA_CERT_PATH}`)
 
 const config: Knex.Config = {
-  client: "pg",
+  client: 'pg',
   connection: {
     connectionString: process.env.POSTGRES_URL,
     ssl: process.env.POSTGRES_CA_CERT_PATH
       ? {
           ca: fs.readFileSync(
-            path.resolve(__dirname, process.env.POSTGRES_CA_CERT_PATH),
+            path.resolve(__dirname, process.env.POSTGRES_CA_CERT_PATH)
           ),
-          rejectUnauthorized: true,
+          rejectUnauthorized: true
         }
-      : undefined,
+      : undefined
   },
   migrations: {
-    directory: "src/migrations",
-    extension: "ts",
-  },
-};
+    directory: 'src/migrations',
+    extension: 'ts'
+  }
+}
 
-export default config;
+export default config

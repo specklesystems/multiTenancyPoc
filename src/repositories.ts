@@ -9,21 +9,21 @@ import {
   Organization,
   OrganizationAcl,
   OrganizationResourceAcl,
-  ResourceRegion,
+  ResourceRegion
 } from './types'
 
 export class RegionRepo {
   db: Knex
 
-  constructor(db: Knex) {
+  constructor (db: Knex) {
     this.db = db
   }
 
-  async saveResource(resource: Resource): Promise<void> {
+  async saveResource (resource: Resource): Promise<void> {
     await this.db<Resource>('resources').insert(resource)
   }
 
-  async findResource(resourceId: string): Promise<Resource | null> {
+  async findResource (resourceId: string): Promise<Resource | null> {
     return (
       (await this.db<Resource>('resources')
         .where({ id: resourceId })
@@ -31,21 +31,21 @@ export class RegionRepo {
     )
   }
 
-  async saveComment(comment: Comment): Promise<void> {
+  async saveComment (comment: Comment): Promise<void> {
     await this.db<Comment>('comments').insert(comment)
   }
 
-  async countComments(resourceId: string): Promise<number> {
+  async countComments (resourceId: string): Promise<number> {
     const [rawCount] = await this.db<Comment>('comments')
       .count()
       .where({ resourceId })
     return parseInt(rawCount.count as string)
   }
 
-  async queryComments({
+  async queryComments ({
     resourceId,
     limit,
-    cursor,
+    cursor
   }: {
     resourceId: string
     limit: number
@@ -60,24 +60,24 @@ export class RegionRepo {
 }
 
 export class MainRepo extends RegionRepo {
-  async findUser(userId: string): Promise<UserRecord | null> {
+  async findUser (userId: string): Promise<UserRecord | null> {
     return (
       (await this.db<UserRecord>('users').where('id', '=', userId).first()) ??
       null
     )
   }
 
-  async queryUsers(): Promise<UserRecord[]> {
+  async queryUsers (): Promise<UserRecord[]> {
     return await this.db<UserRecord>('users').select()
   }
 
-  async saveUser(user: UserRecord): Promise<void> {
+  async saveUser (user: UserRecord): Promise<void> {
     await this.db<UserRecord>('users').insert(user)
   }
 
-  async getUsersResourceAcl({
+  async getUsersResourceAcl ({
     resourceId,
-    userId,
+    userId
   }: ResourceAcl): Promise<ResourceAcl | null> {
     return (
       (await this.db<ResourceAcl>('resource_acl')
@@ -86,20 +86,20 @@ export class MainRepo extends RegionRepo {
     )
   }
 
-  async saveResourceAcl(resourceAcl: ResourceAcl): Promise<void> {
+  async saveResourceAcl (resourceAcl: ResourceAcl): Promise<void> {
     await this.db<ResourceAcl>('resource_acl').insert(resourceAcl)
   }
 
-  async countUsersResources(userId: string): Promise<number> {
+  async countUsersResources (userId: string): Promise<number> {
     const [rawCount] = await this.db<ResourceAcl>('resource_acl')
       .count()
       .where({ userId })
     return parseInt(rawCount.count as string)
   }
 
-  async findUsersResource({
+  async findUsersResource ({
     resourceId,
-    userId,
+    userId
   }: ResourceAcl): Promise<ResourceAcl | null> {
     return (
       (await this.db<ResourceAcl>('resource_acl')
@@ -108,10 +108,10 @@ export class MainRepo extends RegionRepo {
     )
   }
 
-  async queryResources({
+  async queryResources ({
     userId,
     limit,
-    cursor,
+    cursor
   }: {
     userId: string
     limit: number
@@ -127,17 +127,17 @@ export class MainRepo extends RegionRepo {
     return items
   }
 
-  async countResourceComments(resourceId: string): Promise<number> {
+  async countResourceComments (resourceId: string): Promise<number> {
     const [rawCount] = await this.db<Comment>('comments')
       .count()
       .where({ resourceId })
     return parseInt(rawCount.count as string)
   }
 
-  async queryComments({
+  async queryComments ({
     resourceId,
     limit,
-    cursor,
+    cursor
   }: {
     resourceId: string
     limit: number
@@ -150,28 +150,29 @@ export class MainRepo extends RegionRepo {
     return await query.orderBy('createdAt', 'desc').limit(limit)
   }
 
-  async queryRegions(
+  async queryRegions (
     params:
-      | {
-          connectionString?: string | undefined
-        }
-      | undefined = undefined,
-  ): Promise<Array<Region>> {
+    | {
+      connectionString?: string | undefined
+    }
+    | undefined = undefined
+  ): Promise<Region[]> {
     const query = this.db<Region>('regions')
-    if (params && params.connectionString) query.where(params)
+    if ((params != null) && params.connectionString) query.where(params)
     return await query.select()
   }
 
-  async findRegion(id: string): Promise<Region | null> {
+  async findRegion (id: string): Promise<Region | null> {
     return (await this.db<Region>('regions').where({ id }).first()) ?? null
   }
 
-  async queryOrganizationsRegions(): Promise<Array<OrganizationsRegions>> {
+  async queryOrganizationsRegions (): Promise<OrganizationsRegions[]> {
     return await this.db<OrganizationsRegions>('organizations_regions').select()
   }
-  async findOrganizationRegion({
+
+  async findOrganizationRegion ({
     regionId,
-    organizationId,
+    organizationId
   }: OrganizationsRegions): Promise<OrganizationsRegions | null> {
     return (
       (await this.db<OrganizationsRegions>('organizations_regions')
@@ -180,36 +181,38 @@ export class MainRepo extends RegionRepo {
     )
   }
 
-  async saveRegion(region: Region): Promise<void> {
+  async saveRegion (region: Region): Promise<void> {
     await this.db<Region>('regions').insert(region)
   }
-  async saveOrganization(organization: Organization) {
+
+  async saveOrganization (organization: Organization) {
     await this.db<Organization>('organizations').insert(organization)
   }
-  async findOrganization(id: string): Promise<Organization | null> {
+
+  async findOrganization (id: string): Promise<Organization | null> {
     return (
       (await this.db<Organization>('organizations').where({ id }).first()) ??
       null
     )
   }
 
-  async queryOrganizations(): Promise<Organization[]> {
+  async queryOrganizations (): Promise<Organization[]> {
     return await this.db<Organization>('organizations').select()
   }
 
-  async saveOrganizationRegion(or: OrganizationsRegions): Promise<void> {
+  async saveOrganizationRegion (or: OrganizationsRegions): Promise<void> {
     return await this.db<OrganizationsRegions>('organizations_regions').insert(
-      or,
+      or
     )
   }
 
-  async saveOrganizationAcl(orgAcl: OrganizationAcl): Promise<void> {
+  async saveOrganizationAcl (orgAcl: OrganizationAcl): Promise<void> {
     await this.db<OrganizationsRegions>('organization_acl').insert(orgAcl)
   }
 
-  async findOrganizationAcl({
+  async findOrganizationAcl ({
     userId,
-    organizationId,
+    organizationId
   }: OrganizationAcl): Promise<OrganizationAcl | null> {
     return (
       (await this.db<OrganizationAcl>('organization_acl')
@@ -218,16 +221,16 @@ export class MainRepo extends RegionRepo {
     )
   }
 
-  async saveOrganizationResourceAcl(
-    item: OrganizationResourceAcl,
+  async saveOrganizationResourceAcl (
+    item: OrganizationResourceAcl
   ): Promise<void> {
     await this.db<OrganizationResourceAcl>('organization_resource_acl').insert(
-      item,
+      item
     )
   }
 
-  async findResourceRegion({
-    resourceId,
+  async findResourceRegion ({
+    resourceId
   }: {
     resourceId: string
   }): Promise<ResourceRegion | null> {
@@ -238,7 +241,7 @@ export class MainRepo extends RegionRepo {
     )
   }
 
-  async saveResourceRegion(item: ResourceRegion): Promise<void> {
+  async saveResourceRegion (item: ResourceRegion): Promise<void> {
     await this.db<ResourceRegion>('resource_region').insert(item)
   }
 }

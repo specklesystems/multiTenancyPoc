@@ -32,6 +32,7 @@
   "dependencies": {
     "@apollo/server": "^4.10.0",
     "crypto-random-string": "^3.0.0",
+    "dataloader": "^2.2.2",
     "dotenv": "^16.4.1",
     "graphql": "^16.8.1",
     "graphql-scalars": "^1.22.4",

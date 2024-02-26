@@ -1,7 +1,7 @@
-import { RegionRepo, MainRepo } from "./repositories";
-import { getComments } from "./services/comments";
-import { createResource, getResources } from "./services/resources";
-import { GraphQLError } from "graphql";
+import { RegionRepo, MainRepo } from './repositories'
+import { getComments } from './services/comments'
+import { createResource, getResources } from './services/resources'
+import { GraphQLError } from 'graphql'
 import {
   Resource,
   UserRecord,
@@ -11,167 +11,167 @@ import {
   OrganizationsRegions,
   OrganizationAcl,
   CommentCreateArgs,
-  UserCreateArgs,
-} from "./types";
+  UserCreateArgs
+} from './types'
 import {
   createOrganization,
   registerRegion,
   getMainRepo,
   getRegionRepo,
-  getResourceRepo,
-} from "./services/databaseManagement";
-import { authorizeUserOrgRegion } from "./services/authz";
-import cryptoRandomString from "crypto-random-string";
+  getResourceRepo
+} from './services/databaseManagement'
+import { authorizeUserOrgRegion } from './services/authz'
+import cryptoRandomString from 'crypto-random-string'
 
 // Resolvers define how to fetch the types defined in your schema.
 // This resolver retrieves books from the "books" array above.
 export const resolvers = {
   Query: {
-    async users() {
-      return await getMainRepo().queryUsers();
+    async users () {
+      return await getMainRepo().queryUsers()
     },
-    async user(_: unknown, args: { id: string }) {
-      return await getMainRepo().findUser(args.id);
+    async user (_: unknown, args: { id: string }) {
+      return await getMainRepo().findUser(args.id)
     },
-    async resource(
+    async resource (
       _: unknown,
-      args: { id: string; userId: string },
+      args: { id: string, userId: string }
     ): Promise<Resource> {
-      const mainRepo = getMainRepo();
+      const mainRepo = getMainRepo()
       const maybeAcl = await mainRepo.getUsersResourceAcl({
         userId: args.userId,
-        resourceId: args.id,
-      });
+        resourceId: args.id
+      })
       if (maybeAcl == null) {
         throw new GraphQLError(
           "The user doesn't have access to the given resource",
           {
             extensions: {
-              code: "FORBIDDEN",
-            },
-          },
-        );
+              code: 'FORBIDDEN'
+            }
+          }
+        )
       }
-      const resourceRepo = await getResourceRepo(args.id);
-      const maybeResource = await resourceRepo.findResource(args.id);
+      const resourceRepo = await getResourceRepo(args.id)
+      const maybeResource = await resourceRepo.findResource(args.id)
       if (maybeResource == null) {
-        throw new GraphQLError("Resource not found", {
-          extensions: { code: "RESOURCE_NOT_FOUND" },
-        });
+        throw new GraphQLError('Resource not found', {
+          extensions: { code: 'RESOURCE_NOT_FOUND' }
+        })
       }
-      return maybeResource;
+      return maybeResource
     },
-    async organizations() {
-      return await getMainRepo().queryOrganizations();
+    async organizations () {
+      return await getMainRepo().queryOrganizations()
     },
-    async regions() {
-      return await getMainRepo().queryRegions();
-    },
+    async regions () {
+      return await getMainRepo().queryRegions()
+    }
   },
   User: {
-    async resources(parent: UserRecord, args: PaginationArgs) {
-      const mainRepo = getMainRepo();
+    async resources (parent: UserRecord, args: PaginationArgs) {
+      const mainRepo = getMainRepo()
       return await getResources(
         mainRepo.countUsersResources.bind(mainRepo),
-        mainRepo.queryResources.bind(mainRepo),
-      )({ userId: parent.id, ...args });
-    },
+        mainRepo.queryResources.bind(mainRepo)
+      )({ userId: parent.id, ...args })
+    }
   },
   Resource: {
-    async comments(
+    async comments (
       parent: Resource,
-      { limit, cursor }: PaginationArgs,
+      { limit, cursor }: PaginationArgs
     ): Promise<CommentCollection> {
-      const resourceRepo = await getResourceRepo(parent.id);
+      const resourceRepo = await getResourceRepo(parent.id)
       return await getComments(
         resourceRepo.countComments.bind(resourceRepo),
-        resourceRepo.queryComments.bind(resourceRepo),
+        resourceRepo.queryComments.bind(resourceRepo)
       )({
         resourceId: parent.id,
         limit,
-        cursor,
-      });
-    },
+        cursor
+      })
+    }
   },
   Mutation: {
-    async createUser(
+    async createUser (
       _: unknown,
-      { input: { name } }: { input: UserCreateArgs },
+      { input: { name } }: { input: UserCreateArgs }
     ) {
-      const id = cryptoRandomString({ length: 10 });
-      await getMainRepo().saveUser({ id, name });
-      return id;
+      const id = cryptoRandomString({ length: 10 })
+      await getMainRepo().saveUser({ id, name })
+      return id
     },
-    async registerRegion(
+    async registerRegion (
       _: unknown,
       args: {
-        name: string;
-        connectionString: string;
-        sslCaCert: string | null;
-      },
+        name: string
+        connectionString: string
+        sslCaCert: string | null
+      }
     ) {
-      return await registerRegion(args);
+      return await registerRegion(args)
     },
-    async createOrganization(_: unknown, args: { name: string }) {
-      return await createOrganization(args.name);
+    async createOrganization (_: unknown, args: { name: string }) {
+      return await createOrganization(args.name)
     },
-    async addRegionToOrganization(_: unknown, args: OrganizationsRegions) {
-      await getMainRepo().saveOrganizationRegion(args);
+    async addRegionToOrganization (_: unknown, args: OrganizationsRegions) {
+      await getMainRepo().saveOrganizationRegion(args)
     },
-    async addUserToOrganization(
+    async addUserToOrganization (
       _: unknown,
-      { input: args }: { input: OrganizationAcl },
+      { input: args }: { input: OrganizationAcl }
     ) {
-      await getMainRepo().saveOrganizationAcl(args);
+      await getMainRepo().saveOrganizationAcl(args)
     },
-    async createResource(
+    async createResource (
       _: unknown,
-      { input: args }: { input: ResourceCreateArgs },
+      { input: args }: { input: ResourceCreateArgs }
     ) {
-      const mainRepo = getMainRepo();
+      const mainRepo = getMainRepo()
       await authorizeUserOrgRegion(
         mainRepo.findOrganizationAcl.bind(mainRepo),
-        mainRepo.findOrganizationRegion.bind(mainRepo),
-      )(args);
+        mainRepo.findOrganizationRegion.bind(mainRepo)
+      )(args)
 
       const repo = args.regionId
         ? await getRegionRepo({ regionId: args.regionId })
-        : mainRepo;
+        : mainRepo
 
       const resourceId = await createResource(
         repo.saveResource.bind(repo),
-        mainRepo.saveResourceAcl.bind(mainRepo),
-      )(args);
+        mainRepo.saveResourceAcl.bind(mainRepo)
+      )(args)
 
       if (args.organizationId) {
         await mainRepo.saveOrganizationResourceAcl({
           organizationId: args.organizationId,
-          resourceId,
-        });
-        if (args.regionId)
+          resourceId
+        })
+        if (args.regionId) {
           await mainRepo.saveResourceRegion({
             resourceId,
             // i know its not null here, the authz function ensures it
-            regionId: args.regionId,
-          });
+            regionId: args.regionId
+          })
+        }
       }
-      return resourceId;
+      return resourceId
     },
-    async addComment(
+    async addComment (
       _: unknown,
-      { input: args }: { input: CommentCreateArgs },
+      { input: args }: { input: CommentCreateArgs }
     ) {
-      const mainRepo = getMainRepo();
-      const resourceAcl = await mainRepo.getUsersResourceAcl(args);
-      if (!resourceAcl)
-        throw new Error("The user doesn't have access to the given resource");
-      //2. get resource db client
-      const resourceRepo = await getResourceRepo(args.resourceId);
-      //3. save comment to db
-      const id = cryptoRandomString({ length: 10 });
-      const createdAt = new Date();
-      await resourceRepo.saveComment({ id, createdAt, ...args });
-      return id;
-    },
-  },
-};
+      const mainRepo = getMainRepo()
+      const resourceAcl = await mainRepo.getUsersResourceAcl(args)
+      if (resourceAcl == null) { throw new Error("The user doesn't have access to the given resource") }
+      // 2. get resource db client
+      const resourceRepo = await getResourceRepo(args.resourceId)
+      // 3. save comment to db
+      const id = cryptoRandomString({ length: 10 })
+      const createdAt = new Date()
+      await resourceRepo.saveComment({ id, createdAt, ...args })
+      return id
+    }
+  }
+}
