@@ -6,9 +6,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "ts-standard",
-    "tsx": "tsx",
+    "tsx": "docker compose up start_dependencies && tsx watch --clear-screen=false --conditions=typescript ./src/app.ts",
     "lint:fix": "ts-standard --fix",
-    "migration:make": "NODE_OPTIONS='--loader ts-node/esm' knex migrate:make",
+    "migration:make": "NODE_OPTIONS='--import tsx' knex migrate:make",
     "dev:old": "nodemon --ext ts,graphql --exec node --inspect -r @swc/register src/bin/www.ts",
     "build": "tsc",
     "start": "node dist/app.js",
@@ -18,6 +18,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@ducktors/tsconfig": "^1.0.0",
     "@types/node": "^20.11.13",
     "@typescript-eslint/eslint-plugin": "^6.20.0",
     "@typescript-eslint/parser": "^6.20.0",

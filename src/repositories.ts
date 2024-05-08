@@ -1,10 +1,12 @@
-import { knex } from "./db";
-import { UserRecord, Resource, ResourceAcl, Comment } from "./types";
+import { getDB } from "./db";
+import { Region } from "./regions";
+import { UserRecord, Resource, ResourceAcl, Comment, ResourceView } from "./types";
 
-const Users = () => knex<UserRecord>("users");
-const Resources = () => knex<Resource>("resources");
-const ResourceAclRepo = () => knex<ResourceAcl>("resource_acl");
-const Comments = () => knex<Comment>("comments");
+const Users = () => getDB()<UserRecord>("users");
+const Resources = (region: Region) => getDB(region)<Resource>("resources");
+const ResourceViews = () => getDB()<ResourceView>("resource_views");
+const ResourceAclRepo = () => getDB()<ResourceAcl>("resource_acl");
+const Comments = () => getDB()<Comment>("comments");
 
 export const queryUser = async (userId: string): Promise<UserRecord | null> => {
   return (await Users().where("id", "=", userId).first()) ?? null;
@@ -13,7 +15,11 @@ export const queryUser = async (userId: string): Promise<UserRecord | null> => {
 export const queryResource = async (
   resourceId: string,
 ): Promise<Resource | null> => {
-  return (await Resources().where("id", "=", resourceId).first()) ?? null;
+  const resourceLocation = await ResourceViews().where('resourceId', '=', resourceId).first()
+  if (!resourceLocation?.region) {
+    return null
+  }
+  return await Resources(resourceLocation.region).where("id", "=", resourceId).first() || null;
 };
 
 export const queryResourceAcl = async ({
@@ -45,13 +51,13 @@ export const queryResources = async ({
   limit: number;
   cursor: string | null;
 }) => {
-  const query = Resources()
-    .join("resource_acl", "resources.id", "resource_acl.resourceId")
+  const query = ResourceViews()
+    .join("resource_acl", "resource_views.resourceId", "resource_acl.resourceId")
     .where({ userId });
   if (cursor) {
-    query.andWhere("createdAt", "<", cursor);
+    query.andWhere("resourceCreatedAt", "<", cursor);
   }
-  return await query.limit(limit);
+  return query.limit(limit);
 };
 
 export const countComments = async (resourceId: string): Promise<number> => {
@@ -72,5 +78,15 @@ export const queryComments = async ({
   if (cursor) {
     query.andWhere("createdAt", "<", cursor);
   }
-  return await query.limit(limit);
+  return query.limit(limit);
 };
+
+export async function upsertResourceView(region: Region, resource: Resource) {
+  return ResourceViews().insert({
+    resourceId: resource.id,
+    resourceName: resource.name,
+    resourceCreatedAt: resource.createdAt,
+    region: region,
+  }).onConflict('resourceId')
+    .merge()
+}

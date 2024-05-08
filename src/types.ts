@@ -1,3 +1,5 @@
+import { Region } from "./regions";
+
 export interface Comment {
   id: string;
   userId: string;
@@ -17,7 +19,7 @@ interface Collection<T> {
   items: T[];
 }
 
-export interface CommentCollection extends Collection<Comment> {}
+export interface CommentCollection extends Collection<Comment> { }
 
 export interface Resource {
   id: string;
@@ -25,7 +27,7 @@ export interface Resource {
   createdAt: Date;
 }
 
-export interface ResourceCollection extends Collection<Resource> {}
+export interface ResourceCollection extends Collection<Resource> { }
 
 export interface UserRecord {
   id: string;
@@ -43,4 +45,11 @@ export interface User extends UserRecord {
 export interface ResourceAcl {
   userId: string;
   resourceId: string;
+}
+
+export interface ResourceView {
+  region: Region;
+  resourceId: string;
+  resourceName: string;
+  resourceCreatedAt: Date;
 }

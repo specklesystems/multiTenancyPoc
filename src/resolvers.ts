@@ -3,7 +3,6 @@ import { getUser, getResource, getComments, getResources } from "./services";
 import { GraphQLError } from "graphql";
 import {
   Resource,
-  ResourceCollection,
   UserRecord,
   CommentCollection,
   PaginationArgs,
@@ -48,7 +47,7 @@ export const resolvers = {
       return await getResources({ userId: parent.id, ...args });
     },
   },
-  Resource: {
+  ResourceDetail: {
     async comments(
       parent: Resource,
       { limit, cursor }: PaginationArgs,

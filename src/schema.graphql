@@ -15,6 +15,12 @@ type Resource {
   id: String!
   name: String!
   createdAt: DateTime!
+}
+
+type ResourceDetail {
+  id: String!
+  name: String!
+  createdAt: DateTime!
   comments(limit: Int! = 10, cursor: String = null): CommentCollection!
 }
 
@@ -33,5 +39,5 @@ type User {
 type Query {
   user(id: String!): User
 
-  resource(id: String!, userId: String!): Resource
+  resource(id: String!): ResourceDetail
 }

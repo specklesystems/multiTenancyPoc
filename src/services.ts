@@ -15,11 +15,11 @@ import {
 } from "./types";
 
 export const getUser = async (id: string): Promise<UserRecord | null> => {
-  return await queryUser(id);
+  return queryUser(id);
 };
 
 export const getResource = async (id: string): Promise<Resource | null> => {
-  return await queryResource(id);
+  return queryResource(id);
 };
 
 interface GetResourcesArgs extends PaginationArgs {
