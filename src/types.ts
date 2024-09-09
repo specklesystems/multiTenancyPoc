@@ -17,15 +17,16 @@ interface Collection<T> {
   items: T[];
 }
 
-export interface CommentCollection extends Collection<Comment> {}
+export interface CommentCollection extends Collection<Comment> { }
 
 export interface Resource {
   id: string;
   name: string;
   createdAt: Date;
+  region: string
 }
 
-export interface ResourceCollection extends Collection<Resource> {}
+export interface ResourceCollection extends Collection<Resource> { }
 
 export interface UserRecord {
   id: string;
@@ -42,5 +43,11 @@ export interface User extends UserRecord {
 
 export interface ResourceAcl {
   userId: string;
+  resourceId: string;
+}
+
+export interface ResourceMeta {
+  id: string
+  region: string;
   resourceId: string;
 }

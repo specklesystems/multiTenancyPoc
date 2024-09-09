@@ -1,13 +1,40 @@
 version: "3.9"
 
 services:
-  postgres:
+  maindb:
     image: postgres:16-alpine
     ports:
       - 5454:5432
-    volumes:
-      - ./.postgres-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_PASSWORD=speckle
       - POSTGRES_USER=speckle
       - POSTGRES_DB=speckle_main
+
+  eu_db:
+    image: postgres:16-alpine
+    ports:
+      - 5455:5433
+    environment:
+      - POSTGRES_PASSWORD=speckle
+      - POSTGRES_USER=speckle
+      - POSTGRES_DB=speckle_eu
+      - PGPORT=5433
+
+  us_db:
+    image: postgres:16-alpine
+    ports:
+      - 5456:5434
+    environment:
+      - POSTGRES_PASSWORD=speckle
+      - POSTGRES_USER=speckle
+      - POSTGRES_DB=speckle_us
+      - PGPORT=5434
+
+  start_dependencies:
+    image: ducktors/docker-wait-for-dependencies
+    depends_on:
+      - maindb
+      - eu_db
+      - us_db
+    container_name: wait-for-dependencies
+    command: maindb:5432 eu_db:5433 us_db:5434

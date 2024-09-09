@@ -1,4 +1,10 @@
 import Knex from 'knex'
-import config from '../knexfile'
+import config from './config'
+import knexfile from '../knexfile'
 
-export const knex = Knex(config)
+const knexConfig = {
+  ...knexfile,
+  connection: config.MAIN_DB_URI,
+}
+
+export const mainDb = Knex(knexConfig)

@@ -12,7 +12,7 @@
     "dev:old": "nodemon --ext ts,graphql --exec node --inspect -r @swc/register src/bin/www.ts",
     "build": "tsc",
     "start": "node dist/app.js",
-    "dev": "nodemon src/app.ts"
+    "dev": "docker compose up start_dependencies && tsx src/app.ts"
   },
   "keywords": [],
   "author": "",
@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@apollo/server": "^4.10.0",
+    "awilix": "^11.0.0",
     "dotenv": "^16.4.1",
     "graphql": "^16.8.1",
     "graphql-scalars": "^1.22.4",

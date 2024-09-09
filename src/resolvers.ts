@@ -1,4 +1,4 @@
-import { queryResourceAcl } from "./repositories";
+import { queryResource, queryResourceAcl } from "./repositories";
 import { getUser, getResource, getComments, getResources } from "./services";
 import { GraphQLError } from "graphql";
 import {
@@ -13,14 +13,15 @@ import {
 // This resolver retrieves books from the "books" array above.
 export const resolvers = {
   Query: {
-    async user(_: unknown, args: { id: string }) {
-      return await getUser(args.id);
+    async user(_: unknown, args: { id: string }, ctx) {
+      return await ctx.container.cradle.queryUser(args.id);
     },
     async resource(
       _: unknown,
       args: { id: string; userId: string },
+      ctx
     ): Promise<Resource> {
-      const maybeAcl = await queryResourceAcl({
+      const maybeAcl = await ctx.container.cradle.queryResourceAcl({
         userId: args.userId,
         resourceId: args.id,
       });
@@ -34,7 +35,7 @@ export const resolvers = {
           },
         );
       }
-      const maybeResource = await getResource(args.id);
+      const maybeResource = await ctx.container.cradle.queryResource(args.id);
       if (maybeResource == null) {
         throw new GraphQLError("Resource not found", {
           extensions: { code: "RESOURCE_NOT_FOUND" },
