@@ -1,4 +1,4 @@
-import { Knex } from 'knex'
+import { Knex } from "knex";
 import {
   UserRecord,
   Resource,
@@ -9,239 +9,254 @@ import {
   Organization,
   OrganizationAcl,
   OrganizationResourceAcl,
-  ResourceRegion
-} from './types'
+  ResourceRegion,
+} from "./types";
 
-export class RegionRepo {
-  db: Knex
+export const saveResourceFactory =
+  ({ db }: { db: Knex }) =>
+  async (resource: Resource): Promise<void> => {
+    await db<Resource>("resources").insert(resource);
+  };
 
-  constructor (db: Knex) {
-    this.db = db
-  }
-
-  async saveResource (resource: Resource): Promise<void> {
-    await this.db<Resource>('resources').insert(resource)
-  }
-
-  async findResource (resourceId: string): Promise<Resource | null> {
+export const findResourceFactory =
+  ({ db }: { db: Knex }) =>
+  async (resourceId: string): Promise<Resource | null> => {
     return (
-      (await this.db<Resource>('resources')
-        .where({ id: resourceId })
-        .first()) ?? null
-    )
-  }
-
-  async saveComment (comment: Comment): Promise<void> {
-    await this.db<Comment>('comments').insert(comment)
-  }
-
-  async countComments (resourceId: string): Promise<number> {
-    const [rawCount] = await this.db<Comment>('comments')
-      .count()
-      .where({ resourceId })
-    return parseInt(rawCount.count as string)
-  }
-
-  async queryComments ({
-    resourceId,
-    limit,
-    cursor
-  }: {
-    resourceId: string
-    limit: number
-    cursor: string | null
-  }): Promise<Comment[]> {
-    const query = this.db<Comment>('comments').where({ resourceId })
-    if (cursor) {
-      query.andWhere('createdAt', '<', cursor)
-    }
-    return await query.limit(limit)
-  }
-}
-
-export class MainRepo extends RegionRepo {
-  async findUser (userId: string): Promise<UserRecord | null> {
-    return (
-      (await this.db<UserRecord>('users').where('id', '=', userId).first()) ??
+      (await db<Resource>("resources").where({ id: resourceId }).first()) ??
       null
-    )
-  }
+    );
+  };
 
-  async queryUsers (): Promise<UserRecord[]> {
-    return await this.db<UserRecord>('users').select()
-  }
+export const saveCommentFactory =
+  ({ db }: { db: Knex }) =>
+  async (comment: Comment): Promise<void> => {
+    await db<Comment>("comments").insert(comment);
+  };
 
-  async saveUser (user: UserRecord): Promise<void> {
-    await this.db<UserRecord>('users').insert(user)
-  }
-
-  async getUsersResourceAcl ({
-    resourceId,
-    userId
-  }: ResourceAcl): Promise<ResourceAcl | null> {
-    return (
-      (await this.db<ResourceAcl>('resource_acl')
-        .where({ userId, resourceId })
-        .first()) ?? null
-    )
-  }
-
-  async saveResourceAcl (resourceAcl: ResourceAcl): Promise<void> {
-    await this.db<ResourceAcl>('resource_acl').insert(resourceAcl)
-  }
-
-  async countUsersResources (userId: string): Promise<number> {
-    const [rawCount] = await this.db<ResourceAcl>('resource_acl')
+export const countCommentsFactory =
+  ({ db }: { db: Knex }) =>
+  async (resourceId: string): Promise<number> => {
+    const [rawCount] = await db<Comment>("comments")
       .count()
-      .where({ userId })
-    return parseInt(rawCount.count as string)
-  }
+      .where({ resourceId });
+    return parseInt(rawCount.count as string);
+  };
 
-  async findUsersResource ({
-    resourceId,
-    userId
-  }: ResourceAcl): Promise<ResourceAcl | null> {
+export const findUserFactory =
+  ({ db }: { db: Knex }) =>
+  async (userId: string): Promise<UserRecord | null> => {
     return (
-      (await this.db<ResourceAcl>('resource_acl')
+      (await db<UserRecord>("users").where("id", "=", userId).first()) ?? null
+    );
+  };
+
+export const queryUsersFactoy =
+  ({ db }: { db: Knex }) =>
+  async (): Promise<UserRecord[]> => {
+    return await db<UserRecord>("users").select();
+  };
+
+export const saveUserFactory =
+  ({ db }: { db: Knex }) =>
+  async (user: UserRecord): Promise<void> => {
+    await db<UserRecord>("users").insert(user);
+  };
+
+export const getUsersResourceAclFactory =
+  ({ db }: { db: Knex }) =>
+  async ({ resourceId, userId }: ResourceAcl): Promise<ResourceAcl | null> => {
+    return (
+      (await db<ResourceAcl>("resource_acl")
         .where({ userId, resourceId })
         .first()) ?? null
-    )
-  }
+    );
+  };
 
-  async queryResources ({
+export const saveResourceAclFactory =
+  ({ db }: { db: Knex }) =>
+  async (resourceAcl: ResourceAcl): Promise<void> => {
+    await db<ResourceAcl>("resource_acl").insert(resourceAcl);
+  };
+
+export const countUsersResourcesFactory =
+  ({ db }: { db: Knex }) =>
+  async (userId: string): Promise<number> => {
+    const [rawCount] = await db<ResourceAcl>("resource_acl")
+      .count()
+      .where({ userId });
+    return parseInt(rawCount.count as string);
+  };
+
+export const findUsersResourceFactory =
+  ({ db }: { db: Knex }) =>
+  async ({ resourceId, userId }: ResourceAcl): Promise<ResourceAcl | null> => {
+    return (
+      (await db<ResourceAcl>("resource_acl")
+        .where({ userId, resourceId })
+        .first()) ?? null
+    );
+  };
+
+export const queryResourcesFactory =
+  ({ db }: { db: Knex }) =>
+  async ({
     userId,
     limit,
-    cursor
+    cursor,
   }: {
-    userId: string
-    limit: number
-    cursor: string | null
-  }): Promise<Resource[]> {
-    let query = this.db<Resource & ResourceAcl>('resources')
-      .join('resource_acl', 'resources.id', 'resource_acl.resourceId')
-      .where({ userId })
-    if (cursor) {
-      query = query.andWhere('createdAt', '<', cursor)
+    userId: string;
+    limit: number;
+    cursor: string | null;
+  }): Promise<Resource[]> => {
+    let query = db<Resource & ResourceAcl>("resources")
+      .join("resource_acl", "resources.id", "resource_acl.resourceId")
+      .where({ userId });
+    if (cursor !== null) {
+      query = query.andWhere("createdAt", "<", cursor);
     }
-    const items = await query.orderBy('createdAt', 'desc').limit(limit)
-    return items
-  }
+    const items = await query.orderBy("createdAt", "desc").limit(limit);
+    return items;
+  };
 
-  async countResourceComments (resourceId: string): Promise<number> {
-    const [rawCount] = await this.db<Comment>('comments')
+export const countResourceCommentsFactory =
+  ({ db }: { db: Knex }) =>
+  async (resourceId: string): Promise<number> => {
+    const [rawCount] = await db<Comment>("comments")
       .count()
-      .where({ resourceId })
-    return parseInt(rawCount.count as string)
-  }
+      .where({ resourceId });
+    return parseInt(rawCount.count as string);
+  };
 
-  async queryComments ({
+export const queryCommentsFactory =
+  ({ db }: { db: Knex }) =>
+  async ({
     resourceId,
     limit,
-    cursor
+    cursor,
   }: {
-    resourceId: string
-    limit: number
-    cursor: string | null
-  }): Promise<Comment[]> {
-    let query = this.db<Comment>('comments').where({ resourceId })
-    if (cursor) {
-      query = query.andWhere('createdAt', '<', cursor)
+    resourceId: string;
+    limit: number;
+    cursor: string | null;
+  }): Promise<Comment[]> => {
+    let query = db<Comment>("comments").where({ resourceId });
+    if (cursor !== null) {
+      query = query.andWhere("createdAt", "<", cursor);
     }
-    return await query.orderBy('createdAt', 'desc').limit(limit)
-  }
+    return await query.orderBy("createdAt", "desc").limit(limit);
+  };
 
-  async queryRegions (
+export const queryRegionsFactory =
+  ({ db }: { db: Knex }) =>
+  async (
     params:
-    | {
-      connectionString?: string | undefined
-    }
-    | undefined = undefined
-  ): Promise<Region[]> {
-    const query = this.db<Region>('regions')
-    if ((params != null) && params.connectionString) query.where(params)
-    return await query.select()
-  }
+      | {
+          connectionString?: string | undefined;
+        }
+      | undefined = undefined,
+  ): Promise<Region[]> => {
+    let query = db<Region>("regions");
+    if (params?.connectionString !== undefined) query = query.where(params);
+    return await query.select();
+  };
 
-  async findRegion (id: string): Promise<Region | null> {
-    return (await this.db<Region>('regions').where({ id }).first()) ?? null
-  }
+export const findRegionFactory =
+  ({ db }: { db: Knex }) =>
+  async (id: string): Promise<Region | null> => {
+    return (await db<Region>("regions").where({ id }).first()) ?? null;
+  };
 
-  async queryOrganizationsRegions (): Promise<OrganizationsRegions[]> {
-    return await this.db<OrganizationsRegions>('organizations_regions').select()
-  }
+export const queryOrganizationsRegionsFactory =
+  ({ db }: { db: Knex }) =>
+  async (): Promise<OrganizationsRegions[]> => {
+    return await db<OrganizationsRegions>("organizations_regions").select();
+  };
 
-  async findOrganizationRegion ({
+export const findOrganizationRegionFactory =
+  ({ db }: { db: Knex }) =>
+  async ({
     regionId,
-    organizationId
-  }: OrganizationsRegions): Promise<OrganizationsRegions | null> {
+    organizationId,
+  }: OrganizationsRegions): Promise<OrganizationsRegions | null> => {
     return (
-      (await this.db<OrganizationsRegions>('organizations_regions')
+      (await db<OrganizationsRegions>("organizations_regions")
         .where({ regionId, organizationId })
         .first()) ?? null
-    )
-  }
+    );
+  };
 
-  async saveRegion (region: Region): Promise<void> {
-    await this.db<Region>('regions').insert(region)
-  }
+export const saveRegionFactory =
+  ({ db }: { db: Knex }) =>
+  async (region: Region): Promise<void> => {
+    await db<Region>("regions").insert(region);
+  };
 
-  async saveOrganization (organization: Organization) {
-    await this.db<Organization>('organizations').insert(organization)
-  }
+export const saveOrganizationFactory =
+  ({ db }: { db: Knex }) =>
+  async (organization: Organization): Promise<void> => {
+    await db<Organization>("organizations").insert(organization);
+  };
 
-  async findOrganization (id: string): Promise<Organization | null> {
+export const findOrganizationFactory =
+  ({ db }: { db: Knex }) =>
+  async (id: string): Promise<Organization | null> => {
     return (
-      (await this.db<Organization>('organizations').where({ id }).first()) ??
-      null
-    )
-  }
+      (await db<Organization>("organizations").where({ id }).first()) ?? null
+    );
+  };
 
-  async queryOrganizations (): Promise<Organization[]> {
-    return await this.db<Organization>('organizations').select()
-  }
+export const queryOrganizationsFactory =
+  ({ db }: { db: Knex }) =>
+  async (): Promise<Organization[]> => {
+    return await db<Organization>("organizations").select();
+  };
 
-  async saveOrganizationRegion (or: OrganizationsRegions): Promise<void> {
-    return await this.db<OrganizationsRegions>('organizations_regions').insert(
-      or
-    )
-  }
+export const saveOrganizationRegionFactory =
+  ({ db }: { db: Knex }) =>
+  async (or: OrganizationsRegions): Promise<void> => {
+    return await db<OrganizationsRegions>("organizations_regions").insert(or);
+  };
 
-  async saveOrganizationAcl (orgAcl: OrganizationAcl): Promise<void> {
-    await this.db<OrganizationsRegions>('organization_acl').insert(orgAcl)
-  }
+export const saveOrganizationAclFactory =
+  ({ db }: { db: Knex }) =>
+  async (orgAcl: OrganizationAcl): Promise<void> => {
+    await db<OrganizationsRegions>("organization_acl").insert(orgAcl);
+  };
 
-  async findOrganizationAcl ({
+export const findOrganizationAclFactory =
+  ({ db }: { db: Knex }) =>
+  async ({
     userId,
-    organizationId
-  }: OrganizationAcl): Promise<OrganizationAcl | null> {
+    organizationId,
+  }: OrganizationAcl): Promise<OrganizationAcl | null> => {
     return (
-      (await this.db<OrganizationAcl>('organization_acl')
+      (await db<OrganizationAcl>("organization_acl")
         .where({ userId, organizationId })
         .first()) ?? null
-    )
-  }
+    );
+  };
 
-  async saveOrganizationResourceAcl (
-    item: OrganizationResourceAcl
-  ): Promise<void> {
-    await this.db<OrganizationResourceAcl>('organization_resource_acl').insert(
-      item
-    )
-  }
+export const saveOrganizationResourceAclFactory =
+  ({ db }: { db: Knex }) =>
+  async (item: OrganizationResourceAcl): Promise<void> => {
+    await db<OrganizationResourceAcl>("organization_resource_acl").insert(item);
+  };
 
-  async findResourceRegion ({
-    resourceId
+export const findResourceRegionFactory =
+  ({ db }: { db: Knex }) =>
+  async ({
+    resourceId,
   }: {
-    resourceId: string
-  }): Promise<ResourceRegion | null> {
+    resourceId: string;
+  }): Promise<ResourceRegion | null> => {
     return (
-      (await this.db<ResourceRegion>('resource_region')
+      (await db<ResourceRegion>("resource_region")
         .where({ resourceId })
         .first()) ?? null
-    )
-  }
+    );
+  };
 
-  async saveResourceRegion (item: ResourceRegion): Promise<void> {
-    await this.db<ResourceRegion>('resource_region').insert(item)
-  }
-}
+export const saveResourceRegionFactory =
+  ({ db }: { db: Knex }) =>
+  async (item: ResourceRegion): Promise<void> => {
+    await db<ResourceRegion>("resource_region").insert(item);
+  };
