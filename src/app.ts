@@ -3,7 +3,7 @@ import { resolvers } from './resolvers'
 import { startStandaloneServer } from '@apollo/server/standalone'
 import { readFileSync } from 'fs'
 import { typeDefs as scalarTypeDefs } from 'graphql-scalars'
-import { knex } from './db'
+import { migrateAll } from './services/databaseManagement'
 
 const typeDefs = readFileSync('src/schema.graphql', { encoding: 'utf-8' })
 
@@ -19,18 +19,7 @@ const startServer = async (): Promise<void> => {
     listen: { port: 4000 }
   })
 
-  const plannedMigrations: Array<{ file: string }> = (
-    await knex.migrate.list()
-  )[1]
-  if (plannedMigrations.length > 0) {
-    console.log(
-      `🕰️  planning migrations: ${plannedMigrations
-        .map((m) => m.file)
-        .join(',')}`
-    )
-  }
-
-  await knex.migrate.latest()
+  await migrateAll()
 
   console.log(`🚀 Server ready at: ${url}`)
 }
